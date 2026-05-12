@@ -1,66 +1,201 @@
-## Foundry
+# Merkle Airdrop
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+ERC-20 airdrop where eligibility is enforced with a **Merkle tree** on-chain and each claim is additionally authorized by an **EIP-712** signature from the recipient. Built with [Foundry](https://book.getfoundry.sh/).
 
-Foundry consists of:
+---
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## What problem does this solve?
 
-## Documentation
+You want to distribute tokens to many addresses without storing the full list in contract storage (expensive) and without letting arbitrary addresses withdraw. You publish a single **Merkle root** on-chain; each user proves they are in the tree with a short **Merkle proof** plus a **signature** that binds the claim to their address and amount.
 
-https://book.getfoundry.sh/
+---
 
-## Usage
+## What is a Merkle tree?
 
-### Build
+A Merkle tree is a binary tree of hashes:
 
-```shell
-$ forge build
+- **Leaves** are hashes of the data you care about (here: each `(address, amount)` allocation).
+- Each **internal node** is the hash of its two children.
+- The **root** is one `bytes32` that commits to the entire set of leaves.
+
+**Properties used on-chain:**
+
+1. **Commitment** — Changing any allocation changes the root, so the contract can trust one immutable `merkleRoot`.
+2. **Efficient verification** — To prove one leaf belongs to the tree, you only need a logarithmic-size list of sibling hashes (**Merkle proof**), not the full list of users.
+
+**Gas intuition:** Storing `N` addresses in contract storage costs roughly linear gas. Storing one root costs constant gas; each claim pays only for proof length (and a few hashes), which is `O(log N)`.
+
+---
+
+## Leaf format (must match off-chain and on-chain)
+
+This project follows the common **double leaf hash** pattern recommended when using OpenZeppelin-style trees:
+
+```text
+leaf = keccak256(bytes.concat(keccak256(abi.encode(account, amount))))
 ```
 
-### Test
+The off-chain generator (`MakeMerkle.s.sol`, Murky) and `MerkleAirdrop` use the same construction so proofs produced from `script/target/input.json` verify against the root you deploy.
 
-```shell
-$ forge test
+---
+
+## How `MerkleAirdrop` works
+
+High-level flow of `claim(account, amount, merkleProof, v, r, s)`:
+
+1. **Already claimed** — Reverts if `account` has claimed before (`s_alreadyClaimed[account]`).
+2. **EIP-712 signature** — Builds the typed-data digest for `AirdropClaim { account, amount }` via OpenZeppelin `EIP712` (`name = "MerkleAirdrop"`, `version = "1"`, `verifyingContract = address(this)`). `ecrecover` must equal `account`.  
+   - This proves the holder of `account`’s private key agreed to this specific `(account, amount)` for **this** contract and **this** chain.  
+   - `msg.sender` is **not** required to be `account`: anyone can relay the transaction (gas payer), which is why the test uses `vm.prank(claimer)`.
+3. **Merkle proof** — Recomputes `leaf` from `(account, amount)` and checks `MerkleProof.verify(proof, merkleRoot, leaf)`.
+4. **Payout** — Marks `account` as claimed, emits `Claim`, and `safeTransfer`s `amount` of the configured ERC-20 to `account`.
+
+**Important:** The EIP-712 digest includes the **deployed contract address** and **chain id**. A signature produced against another deployment or network will fail with `MerkleAirdrop__InvalidSignature()`.
+
+---
+
+## Repository layout
+
+| Path | Role |
+|------|------|
+| `src/MerkleAirdrop.sol` | Airdrop logic: Merkle + EIP-712 + ERC-20 transfer |
+| `src/VroomToken.sol` | Simple mintable ERC-20 used as the airdrop token |
+| `script/GenerateInput.s.sol` | Writes `script/target/input.json` (recipients + amounts) |
+| `script/MakeMerkle.s.sol` | Reads input, builds tree with Murky, writes `script/target/output.json` (proofs + root) |
+| `script/DeployMerkleAirdrop.s.sol` | Deploys token + airdrop and mints supply to the airdrop contract |
+| `script/ClaimAirdrop.s.sol` | Resolves latest `MerkleAirdrop` from broadcast logs, signs digest with `PRIVATE_KEY`, calls `claim` |
+| `test/MerkleAirdropTest.t.sol` | Integration test: deploy, sign, claim via a relayer-style caller |
+
+---
+
+## Prerequisites
+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge`, `cast`, optional `anvil`)
+- Submodules: `git submodule update --init --recursive`
+- For testnet/mainnet: RPC URL and funded wallet(s)
+
+---
+
+## Setup
+
+```bash
+cd airdrop
+git submodule update --init --recursive
+forge build
+forge test
 ```
 
-### Format
+Tests that sign claims expect `PRIVATE_KEY` in the environment (see [Testing](#testing)).
 
-```shell
-$ forge fmt
+---
+
+## End-to-end workflow (new airdrop round)
+
+### 1. Define recipients
+
+Edit `script/GenerateInput.s.sol` (addresses and amount), then:
+
+```bash
+forge script script/GenerateInput.s.sol:GenerateInput --sig "run()" -vv
 ```
 
-### Gas Snapshots
+This writes `script/target/input.json`.
 
-```shell
-$ forge snapshot
+### 2. Build the Merkle tree and proofs
+
+```bash
+forge script script/MakeMerkle.s.sol:MakeMerkle --sig "run()" -vv
 ```
 
-### Anvil
+This writes `script/target/output.json` (per-leaf `inputs`, `proof`, `root`, `leaf`).
 
-```shell
-$ anvil
+### 3. Align on-chain root with off-chain tree
+
+Copy the **`root`** from `output.json` into `script/DeployMerkleAirdrop.s.sol` as `merckleRoot` before deploying (or redeploying) so the contract’s immutable root matches the proofs.
+
+### 4. Deploy (example: Sepolia)
+
+Create a `.env` (never commit it; it is gitignored):
+
+```bash
+RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
+PRIVATE_KEY=0x...          # deployer / minter
+ETHERSCAN_API=...          # optional, for verification
 ```
 
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```bash
+make deploy-sepolia
+# or: forge script script/DeployMerkleAirdrop.s.sol:DeployMerkleAirdrop --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast ...
 ```
 
-### Cast
+### 5. Configure the claim script
 
-```shell
-$ cast <subcommand>
+`ClaimAirdrop.s.sol` is tied to **one** leaf from `output.json`:
+
+- `user` — recipient address for that leaf  
+- `AMOUNT` — must match that leaf’s amount  
+- `PROOF0`, `PROOF1`, … — proof siblings from the same JSON entry  
+- `MERKLE_ROOT` — informational constant; the live root is whatever was deployed  
+
+`ClaimAirdrop` uses [foundry-devops](https://github.com/ChainAccelOrg/foundry-devops) to read the latest `MerkleAirdrop` address from `broadcast/` for the current `chainid`.
+
+### 6. Claim on-chain
+
+The **same** `PRIVATE_KEY` must control `user` in `ClaimAirdrop.s.sol` (the script signs `getMessageHash(user, AMOUNT)` with that key, then broadcasts `claim`).
+
+```bash
+make claim-airdrop
 ```
 
-### Help
+**Signing off-line:** You can also use `cast call` on `getMessageHash(address,uint256)` against the **deployed** contract, then `cast wallet sign --no-hash <digest> --private-key ...`, and paste `v,r,s` into a custom script—but the checked-in script signs in-process so the digest always matches the deployment.
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+---
+
+## Makefile targets
+
+| Target | Purpose |
+|--------|---------|
+| `make build` | `forge build` |
+| `make test` | `forge test` |
+| `make deploy-sepolia` | Deploy token + airdrop (uses `.env`) |
+| `make claim-airdrop` | Run `ClaimAirdrop` script with `--broadcast` |
+
+---
+
+## Testing
+
+```bash
+export PRIVATE_KEY=0x...   # must be the key for `user` in `MerkleAirdropTest.t.sol` (default leaf address)
+forge test
 ```
+
+The test deploys via `DeployMerkleAirdrop`, signs the EIP-712 digest for `user`, and calls `claim` from a different address to mirror a relayer paying gas.
+
+---
+
+## CI
+
+`.github/workflows/test.yml` runs `forge build` and `forge test`. Add a repository secret `PRIVATE_KEY` (test key with no mainnet funds) if you want CI to pass the signing test; alternatively adjust the workflow to use a deterministic Anvil key.
+
+---
+
+## Security and hygiene notes
+
+- **Private keys** belong in `.env` or CI secrets, never in source or committed broadcast files.
+- **EIP-712 signatures** for `claim` are not generic wallet keys; they only authorize that typed message for that contract and chain. After a successful claim they are already public in transaction calldata. This repo **gitignores** `broadcast/ClaimAirdrop.s.sol/` to avoid committing redundant signature-bearing artifacts; deploy broadcasts remain for address discovery.
+- **Merkle root** is immutable after deploy. To change allocations, deploy a new `MerkleAirdrop` (and fund it) with a new root.
+
+---
+
+## Further reading
+
+- [Foundry Book](https://book.getfoundry.sh/)
+- [OpenZeppelin MerkleProof](https://docs.openzeppelin.com/contracts/api/utils#MerkleProof)
+- [OpenZeppelin EIP-712](https://docs.openzeppelin.com/contracts/api/utils#EIP712)
+- [EIP-712: Typed structured data hashing and signing](https://eips.ethereum.org/EIPS/eip-712)
+
+---
+
+## License
+
+See SPDX identifiers in individual source files.
