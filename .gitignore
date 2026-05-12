@@ -6,6 +6,8 @@ out/
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
+# Claim script broadcasts embed v,r,s calldata; deploy broadcasts stay tracked for addresses.
+/broadcast/ClaimAirdrop.s.sol/
 
 # Docs
 docs/
