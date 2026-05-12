@@ -22,6 +22,6 @@ install:
 deploy-sepolia:
 	forge script script/DeployMerkleAirdrop.s.sol:DeployMerkleAirdrop --rpc-url ${RPC_URL} --private-key ${PRIVATE_KEY} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API}
 
-# Set USER_PRIVATE_KEY in .env to the key for `user` in script/ClaimAirdrop.s.sol (same leaf as script/target/input.json).
+# PRIVATE_KEY in .env must control `user` in script/ClaimAirdrop.s.sol (same leaf as script/target/input.json).
 claim-airdrop:
 	forge script script/ClaimAirdrop.s.sol:ClaimAirdrop --private-key ${PRIVATE_KEY} --rpc-url ${RPC_URL} --broadcast
