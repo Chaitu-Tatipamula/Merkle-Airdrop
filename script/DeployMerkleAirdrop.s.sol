@@ -8,6 +8,7 @@ import {VroomToken} from "../src/VroomToken.sol";
 contract DeployMerkleAirdrop is Script {
     VroomToken token;
     MerkleAirdrop airdrop;
+
     function run() public returns (MerkleAirdrop, VroomToken) {
         vm.startBroadcast();
         bytes32 merckleRoot = 0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe;

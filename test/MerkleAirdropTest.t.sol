@@ -10,8 +10,7 @@ contract MerkleAirdropTest is Test {
     VroomToken private token;
     MerkleAirdrop public airdrop;
 
-    bytes32 public constant MERKLE_ROOT =
-        0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe;
+    bytes32 public constant MERKLE_ROOT = 0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe;
     uint256 public constant AMOUNT = 2500e18;
     bytes32 public PROOF0 = 0xc84f370fffe6f29b5ff4ae14c799b15161b7b77d8a664f60d0e0fb251d71d395;
     bytes32 public PROOF1 = 0x6c2ded42dd1d687e15cccc927631c092b43d674e009dcbbe98b5b29ea301ebf8;

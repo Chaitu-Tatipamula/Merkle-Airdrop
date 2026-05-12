@@ -5,6 +5,7 @@ import {Script} from "forge-std/Script.sol";
 
 contract GenerateInput is Script {
     string constant FILE_PATH = "script/target/input.json";
+
     function run() external {
         string[] memory types = new string[](2);
         types[0] = "address";
@@ -22,23 +23,26 @@ contract GenerateInput is Script {
         vm.writeFile(FILE_PATH, json);
     }
 
-    function createJSON(string[] memory types, uint256 amount, address[] memory addresses) internal pure returns (string memory) {
+    function createJSON(string[] memory types, uint256 amount, address[] memory addresses)
+        internal
+        pure
+        returns (string memory)
+    {
         string memory json = "{";
 
         json = string.concat(json, "\"types\" : [ ");
-        for(uint i =0; i < types.length; i++){
+        for (uint256 i = 0; i < types.length; i++) {
             json = string.concat(json, "\"", types[i], "\"");
-            if(i < types.length - 1){
+            if (i < types.length - 1) {
                 json = string.concat(json, ",");
             }
         }
         json = string.concat(json, "], ");
-        
+
         json = string.concat(json, "\"count\": ", vm.toString(uint256(addresses.length)), ",");
-        
-        
+
         json = string.concat(json, "\"values\" : {");
-        for(uint i =0; i < addresses.length; i++){
+        for (uint256 i = 0; i < addresses.length; i++) {
             json = string.concat(
                 json,
                 "\"",
@@ -50,16 +54,12 @@ contract GenerateInput is Script {
                 "\"1\": \"",
                 vm.toString(amount),
                 "\"}"
-
             );
-            if(i < addresses.length - 1){
+            if (i < addresses.length - 1) {
                 json = string.concat(json, ",");
             }
         }
         json = string.concat(json, "}}");
         return json;
-
-
-
     }
 }
