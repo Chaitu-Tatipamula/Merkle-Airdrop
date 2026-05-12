@@ -1,41 +1,50 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.15;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {VroomToken} from "../src/VroomToken.sol";
 import {MerkleAirdrop} from "../src/MerkleAirdrop.sol";
-import {DeployMerkleAirdrop} from "../script/DeployMerkleAirdrop.s.sol";
 
 contract MerkleAirdropTest is Test {
+    /// @dev Well-known Anvil default account #0 — safe to embed for unit tests only.
+    address internal constant USER = address(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
+    uint256 internal constant DEFAULT_USER_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
+
     VroomToken private token;
     MerkleAirdrop public airdrop;
 
-    bytes32 public constant MERKLE_ROOT = 0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe;
     uint256 public constant AMOUNT = 2500e18;
-    bytes32 public PROOF0 = 0xc84f370fffe6f29b5ff4ae14c799b15161b7b77d8a664f60d0e0fb251d71d395;
-    bytes32 public PROOF1 = 0x6c2ded42dd1d687e15cccc927631c092b43d674e009dcbbe98b5b29ea301ebf8;
-    bytes32[] public PROOF = [PROOF0, PROOF1];
 
-    address user = 0xD117738595dfAFe4c2f96bcF63Ed381788E08d39;
-    uint256 key;
-    address claimInteractor;
+    uint256 internal userKey;
+    address internal claimInteractor;
+    bytes32[] internal proof;
 
     function setUp() public {
-        DeployMerkleAirdrop deployer = new DeployMerkleAirdrop();
-        (airdrop, token) = deployer.run();
-        key = vm.envUint("PRIVATE_KEY");
+        userKey = vm.envOr("TEST_USER_PRIVATE_KEY", DEFAULT_USER_KEY);
+        require(vm.addr(userKey) == USER, "TEST_USER_PRIVATE_KEY must control USER (Anvil #0)");
+
+        // Single-leaf tree: OpenZeppelin MerkleProof.verify([], root, leaf) requires root == leaf.
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(USER, AMOUNT))));
+        bytes32 root = leaf;
+        proof = new bytes32[](0);
+
+        token = new VroomToken();
+        airdrop = new MerkleAirdrop(IERC20(address(token)), root);
+        token.mint(address(airdrop), 1e23);
+
         claimInteractor = makeAddr("claimer");
     }
 
     function testUsersCanClaim() public {
-        uint256 startingUserBalance = token.balanceOf(user);
-        bytes32 digest = airdrop.getMessageHash(user, AMOUNT);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
+        uint256 startingUserBalance = token.balanceOf(USER);
+        bytes32 digest = airdrop.getMessageHash(USER, AMOUNT);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userKey, digest);
 
         vm.prank(claimInteractor);
-        airdrop.claim(user, AMOUNT, PROOF, v, r, s);
+        airdrop.claim(USER, AMOUNT, proof, v, r, s);
 
-        assertEq(token.balanceOf(user), startingUserBalance + AMOUNT);
-        assertEq(airdrop.claimStatus(user), true);
+        assertEq(token.balanceOf(USER), startingUserBalance + AMOUNT);
+        assertEq(airdrop.claimStatus(USER), true);
     }
 }

@@ -64,7 +64,7 @@ High-level flow of `claim(account, amount, merkleProof, v, r, s)`:
 | `script/MakeMerkle.s.sol` | Reads input, builds tree with Murky, writes `script/target/output.json` (proofs + root) |
 | `script/DeployMerkleAirdrop.s.sol` | Deploys token + airdrop and mints supply to the airdrop contract |
 | `script/ClaimAirdrop.s.sol` | Resolves latest `MerkleAirdrop` from broadcast logs, signs digest with `PRIVATE_KEY`, calls `claim` |
-| `test/MerkleAirdropTest.t.sol` | Integration test: deploy, sign, claim via a relayer-style caller |
+| `test/MerkleAirdropTest.t.sol` | Unit test: single-leaf Merkle tree, Anvil #0 signer, relayer `prank` (no env required in CI) |
 
 ---
 
@@ -84,8 +84,6 @@ git submodule update --init --recursive
 forge build
 forge test
 ```
-
-Tests that sign claims expect `PRIVATE_KEY` in the environment (see [Testing](#testing)).
 
 ---
 
@@ -164,18 +162,21 @@ make claim-airdrop
 
 ## Testing
 
+`MerkleAirdropTest` deploys a **one-leaf** Merkle tree: the root equals the leaf hash for `(USER, AMOUNT)`, so the proof array is empty and still passes `MerkleProof.verify` (OpenZeppelin rebuilds `leaf` as the root). The signer is **Anvil account #0** (`0xf39F…` / well-known dev private key) so CI does not need GitHub secrets.
+
+Optional: set `TEST_USER_PRIVATE_KEY` only if you change `USER` in the test and need a matching key.
+
 ```bash
-export PRIVATE_KEY=0x...   # must be the key for `user` in `MerkleAirdropTest.t.sol` (default leaf address)
 forge test
 ```
 
-The test deploys via `DeployMerkleAirdrop`, signs the EIP-712 digest for `user`, and calls `claim` from a different address to mirror a relayer paying gas.
+The test signs the EIP-712 digest for `USER` and calls `claim` from a different address (`makeAddr("claimer")`) to mirror a relayer paying gas.
 
 ---
 
 ## CI
 
-`.github/workflows/test.yml` runs `forge build` and `forge test`. Add a repository secret `PRIVATE_KEY` (test key with no mainnet funds) if you want CI to pass the signing test; alternatively adjust the workflow to use a deterministic Anvil key.
+`.github/workflows/test.yml` runs `forge fmt --check`, `forge build --sizes`, and `forge test`. No repository secrets are required.
 
 ---
 
