@@ -1,0 +1,50 @@
+[
+    {
+        "inputs": [
+            "0xD117738595dfAFe4c2f96bcF63Ed381788E08d39",
+            "2500000000000000000000"
+        ],
+        "proof": [
+            "0xc84f370fffe6f29b5ff4ae14c799b15161b7b77d8a664f60d0e0fb251d71d395",
+            "0x6c2ded42dd1d687e15cccc927631c092b43d674e009dcbbe98b5b29ea301ebf8"
+        ],
+        "root": "0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe",
+        "leaf": "0x69ab9d597f730dc9143a146acf62180b522fe6880bbe814e9e4e9b1e9b0f1e31"
+    },
+    {
+        "inputs": [
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "2500000000000000000000"
+        ],
+        "proof": [
+            "0x69ab9d597f730dc9143a146acf62180b522fe6880bbe814e9e4e9b1e9b0f1e31",
+            "0x6c2ded42dd1d687e15cccc927631c092b43d674e009dcbbe98b5b29ea301ebf8"
+        ],
+        "root": "0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe",
+        "leaf": "0xc84f370fffe6f29b5ff4ae14c799b15161b7b77d8a664f60d0e0fb251d71d395"
+    },
+    {
+        "inputs": [
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+            "2500000000000000000000"
+        ],
+        "proof": [
+            "0x4732fe6abfd332bc7466e9fd47b178af2037a782db412bcd8ce84cdbc543d299",
+            "0xdb68023825d603093e2632706d45adaa14799b67ce838ec057fc686282091b9e"
+        ],
+        "root": "0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe",
+        "leaf": "0x8dd138cb972a37d1a29c9109f9a04e6e8c731cadb55fe2c634bde7abae503f10"
+    },
+    {
+        "inputs": [
+            "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+            "2500000000000000000000"
+        ],
+        "proof": [
+            "0x8dd138cb972a37d1a29c9109f9a04e6e8c731cadb55fe2c634bde7abae503f10",
+            "0xdb68023825d603093e2632706d45adaa14799b67ce838ec057fc686282091b9e"
+        ],
+        "root": "0xc2475430f7e0355b1691d6333a80ddbaf4aa921d6e498c4df6af9a298a7182fe",
+        "leaf": "0x4732fe6abfd332bc7466e9fd47b178af2037a782db412bcd8ce84cdbc543d299"
+    }
+]
